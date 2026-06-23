@@ -242,6 +242,8 @@ st.markdown("""
         background: linear-gradient(180deg, #0f1e3d 0%, #1a3060 100%);
     }
     [data-testid="stSidebar"] * { color: #e2e8f0 !important; }
+    [data-testid="stSidebar"] .db-source-mysql { color: #22c55e !important; }
+    [data-testid="stSidebar"] .db-source-csv   { color: #f59e0b !important; }
     [data-testid="stSidebar"] h2, [data-testid="stSidebar"] h3 {
         color: #ffd700 !important;
         font-family: 'Poppins', sans-serif !important;
@@ -391,14 +393,14 @@ with st.sidebar:
 
     page = st.radio(
         "Navigasaun",
-        ["Beranda", "Klasifikasaun", "Dataset", "Modelu", "Kona-ba"],
+        ["Beranda", "Klasifikasaun", "Dataset", "Modelu", "Database", "Kona-ba"],
         label_visibility="collapsed"
     )
 
     st.markdown("---")
 
     db_source = df_full.attrs.get('source', 'CSV')
-    db_color  = '#22c55e' if db_source == 'MySQL' else '#f59e0b'
+    db_cls    = 'db-source-mysql' if db_source == 'MySQL' else 'db-source-csv'
     st.markdown(f"""
         <div class='sidebar-stat'>
             <div class='sidebar-stat-label'>Dataset</div>
@@ -414,7 +416,7 @@ with st.sidebar:
         </div>
         <div class='sidebar-stat'>
             <div class='sidebar-stat-label'>Fonte Dadus</div>
-            <div class='sidebar-stat-value' style='color:{db_color} !important; font-size:1rem;'>
+            <div class='{db_cls}' style='font-size:1rem; font-weight:800; font-family:Poppins,sans-serif;'>
                 {db_source}
             </div>
         </div>
@@ -792,7 +794,128 @@ elif page == "Modelu":
     })
 
 # ══════════════════════════════════════════════════════════════════════════════
-# PAGE 5 — KONA-BA
+# PAGE 5 — DATABASE
+# ══════════════════════════════════════════════════════════════════════════════
+elif page == "Database":
+    import mysql.connector
+    import sqlite3
+
+    st.markdown('<h1 class="page-title">Dashboard Database</h1>', unsafe_allow_html=True)
+    st.markdown('<p class="page-subtitle">Status koneksaun no dadus diretu husi MySQL no SQLite</p>',
+                unsafe_allow_html=True)
+
+    # ── MYSQL STATUS ──────────────────────────────────────────────────────────
+    st.markdown('<div class="section-header">MySQL — buirenggoboxfit.dataset_boxing</div>',
+                unsafe_allow_html=True)
+
+    try:
+        conn_my = mysql.connector.connect(**{
+            "host": "localhost", "user": "root", "password": "",
+            "database": "buirenggoboxfit", "port": 3306
+        })
+        cur_my = conn_my.cursor()
+
+        cur_my.execute("SELECT COUNT(*) FROM dataset_boxing")
+        row_count = cur_my.fetchone()[0]
+
+        cur_my.execute("SELECT prontidaun_fiziku, COUNT(*) FROM dataset_boxing GROUP BY prontidaun_fiziku")
+        dist = cur_my.fetchall()
+
+        cur_my.execute("SHOW COLUMNS FROM dataset_boxing")
+        cols_info = cur_my.fetchall()
+
+        conn_my.close()
+
+        st.markdown("""
+        <div class='info-card' style='border-left:4px solid #22c55e;'>
+            <span style='color:#22c55e; font-weight:800; font-size:1.1rem;'>Konektadu</span>
+            &nbsp;&nbsp;|&nbsp;&nbsp; host: localhost &nbsp;|&nbsp; database: buirenggoboxfit &nbsp;|&nbsp; table: dataset_boxing
+        </div>
+        """, unsafe_allow_html=True)
+
+        m1, m2, m3 = st.columns(3)
+        with m1: st.metric("Total Rekordu", row_count)
+        with m2: st.metric("Total Koluna", len(cols_info))
+        with m3: st.metric("Status", "Online")
+
+        st.markdown("<br>", unsafe_allow_html=True)
+
+        col_dist, col_col = st.columns(2)
+        with col_dist:
+            st.markdown("**Distribuisaun Klase**")
+            df_dist = pd.DataFrame(dist, columns=["Klase", "Total"])
+            st.dataframe(df_dist, use_container_width=True, hide_index=True)
+
+        with col_col:
+            st.markdown("**Estrutura Tabel (DESCRIBE)**")
+            df_cols = pd.DataFrame(cols_info, columns=["Field", "Type", "Null", "Key", "Default", "Extra"])
+            st.dataframe(df_cols[["Field", "Type", "Key"]], use_container_width=True, hide_index=True)
+
+        st.markdown("<br>", unsafe_allow_html=True)
+        st.markdown("**Preview Dadus (10 linha terotu)**")
+        query_preview = "SELECT * FROM dataset_boxing ORDER BY RAND() LIMIT 10"
+        st.code(query_preview, language="sql")
+
+        conn_my2 = mysql.connector.connect(**{
+            "host": "localhost", "user": "root", "password": "",
+            "database": "buirenggoboxfit", "port": 3306
+        })
+        df_preview = pd.read_sql(query_preview, conn_my2)
+        conn_my2.close()
+        st.dataframe(df_preview, use_container_width=True, hide_index=True)
+
+    except Exception as e:
+        st.markdown(f"""
+        <div class='info-card' style='border-left:4px solid #e74c3c;'>
+            <span style='color:#e74c3c; font-weight:800;'>Offline</span>
+            &nbsp;&nbsp;|&nbsp;&nbsp; {e}
+        </div>
+        """, unsafe_allow_html=True)
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    # ── SQLITE STATUS ─────────────────────────────────────────────────────────
+    st.markdown('<div class="section-header">SQLite — buirenggoboxfit.db (avaliasaun)</div>',
+                unsafe_allow_html=True)
+
+    db_path = "data/buirenggoboxfit.db"
+    try:
+        conn_sq = sqlite3.connect(db_path)
+        cur_sq  = conn_sq.cursor()
+
+        cur_sq.execute("SELECT COUNT(*) FROM avaliasaun")
+        sq_count = cur_sq.fetchone()[0]
+
+        cur_sq.execute("SELECT * FROM avaliasaun ORDER BY id DESC LIMIT 10")
+        sq_rows  = cur_sq.fetchall()
+        sq_cols  = [d[0] for d in cur_sq.description]
+        conn_sq.close()
+
+        st.markdown(f"""
+        <div class='info-card' style='border-left:4px solid #3498db;'>
+            <span style='color:#3498db; font-weight:800;'>Ativa</span>
+            &nbsp;&nbsp;|&nbsp;&nbsp; {db_path} &nbsp;|&nbsp; table: avaliasaun &nbsp;|&nbsp; {sq_count} rekordu
+        </div>
+        """, unsafe_allow_html=True)
+
+        st.metric("Total Avaliasaun Tersimpan", sq_count)
+
+        if sq_count > 0:
+            st.markdown("**10 Avaliasaun Terakhir**")
+            st.dataframe(pd.DataFrame(sq_rows, columns=sq_cols), use_container_width=True, hide_index=True)
+        else:
+            st.info("Seidauk iha avaliasaun ne'ebe salva. Halo klasifikasaun iha pajina Klasifikasaun molok.")
+
+    except Exception as e:
+        st.markdown(f"""
+        <div class='info-card' style='border-left:4px solid #e74c3c;'>
+            <span style='color:#e74c3c; font-weight:800;'>Error</span>
+            &nbsp;&nbsp;|&nbsp;&nbsp; {e}
+        </div>
+        """, unsafe_allow_html=True)
+
+# ══════════════════════════════════════════════════════════════════════════════
+# PAGE 6 — KONA-BA
 # ══════════════════════════════════════════════════════════════════════════════
 elif page == "Kona-ba":
     st.markdown('<h1 class="page-title">Kona-ba Peskiza</h1>', unsafe_allow_html=True)
