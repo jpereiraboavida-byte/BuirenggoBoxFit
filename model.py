@@ -6,6 +6,7 @@ from sklearn.preprocessing import LabelEncoder
 from sklearn.metrics import (accuracy_score, classification_report,
                              confusion_matrix, precision_score, recall_score, f1_score)
 import pickle
+import os
 
 FEATURE_COLS = [
     'vo2max', 'pushup', 'situp', 'shuttle_run', 'sprint_30m',
@@ -42,10 +43,36 @@ CLASS_DESC = {
 }
 
 
+def load_data_mysql():
+    """Karga dadus husi MySQL database — buirenggoboxfit.dataset_boxing"""
+    try:
+        import mysql.connector
+        from db_config import MYSQL_CONFIG, MYSQL_TABLE
+        conn = mysql.connector.connect(**MYSQL_CONFIG)
+        query = f"SELECT id_atleta, {', '.join(FEATURE_COLS)}, {TARGET_COL} FROM {MYSQL_TABLE}"
+        df = pd.read_sql(query, conn)
+        conn.close()
+        return df, "mysql"
+    except Exception as e:
+        return None, str(e)
+
+
 def load_data(filepath: str):
-    df = pd.read_csv(filepath)
-    X  = df[FEATURE_COLS]
-    y  = df[TARGET_COL]
+    """
+    Karga dadus — prioridade MySQL, fallback ba CSV.
+    1. Tenta koneksaun MySQL (buirenggoboxfit.dataset_boxing)
+    2. Se MySQL la disponivel, uza CSV
+    """
+    df_mysql, status = load_data_mysql()
+    if df_mysql is not None and len(df_mysql) > 0:
+        df = df_mysql
+        df.attrs['source'] = 'MySQL'
+    else:
+        df = pd.read_csv(filepath)
+        df.attrs['source'] = 'CSV'
+
+    X = df[FEATURE_COLS]
+    y = df[TARGET_COL]
     return X, y, df
 
 

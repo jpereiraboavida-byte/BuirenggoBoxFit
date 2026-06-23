@@ -397,6 +397,8 @@ with st.sidebar:
 
     st.markdown("---")
 
+    db_source = df_full.attrs.get('source', 'CSV')
+    db_color  = '#22c55e' if db_source == 'MySQL' else '#f59e0b'
     st.markdown(f"""
         <div class='sidebar-stat'>
             <div class='sidebar-stat-label'>Dataset</div>
@@ -409,6 +411,12 @@ with st.sidebar:
         <div class='sidebar-stat'>
             <div class='sidebar-stat-label'>CV Score</div>
             <div class='sidebar-stat-value'>{metrics['cv_mean']*100:.1f}%</div>
+        </div>
+        <div class='sidebar-stat'>
+            <div class='sidebar-stat-label'>Fonte Dadus</div>
+            <div class='sidebar-stat-value' style='color:{db_color} !important; font-size:1rem;'>
+                {db_source}
+            </div>
         </div>
     """, unsafe_allow_html=True)
 
